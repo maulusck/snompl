@@ -23,7 +23,7 @@ settings:
   admin_mode_password: "0000"    # phone menu lock; digits 0-9
   http_user: admin               # web UI login (8.x)
   http_pass: CHANGEME
-  # webserver_type: off          # disable web UI entirely; hardest lock, needs reboot
+  webserver_type: https          # 'off' to disable web UI entirely; hardest lock, needs reboot
   update_policy: settings_only   # never fetch firmware
 
 devices:
