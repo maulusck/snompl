@@ -53,24 +53,26 @@ done
 ## Fleet file format
 
 ```yaml
-# perm applies to every emitted setting: R = locked, RW or "" = user-editable.
-perm: R
+# Snom XML provisioning. Values apply as-is; unknown keys are silently ignored.
+perm: R                          # R locked, RW or "" user-editable
 
-# Global settings applied to every phone. Keys are raw Snom setting names.
 settings:
   language: English
-  timezone: UTC                 # localisation / clock; fixes the "Wrong Dst" error
+  timezone: UTC                  # Snom zone code, e.g. USA-5, ITA+1
   tone_scheme: USA
   ntp_server: pool.ntp.org
   admin_mode: "1"
-  admin_mode_password: "0000"   # digits 0-9 only; change before deploying
-  update_policy: settings_only  # load settings, never fetch firmware
+  admin_mode_password: "0000"    # phone menu lock; digits 0-9
+  http_user: admin               # web UI login (8.x)
+  http_pass: CHANGEME
+  # webserver_type: off          # disable web UI entirely; hardest lock, needs reboot
+  update_policy: settings_only   # never fetch firmware
 
 devices:
-  - mac: "00-04-13-00-00-00"    # Snom OUI + placeholder; colon, hyphen, dot or none all normalize
-    settings:                   # optional: per-phone overrides of the globals
+  - mac: "00-04-13-00-00-00"     # any separator; replace with real MAC
+    settings:                    # optional: per-phone overrides of the globals
       timezone: USA-5
-    accounts:                   # each entry becomes SIP identity idx=1, 2, 3...
+    accounts:                    # each entry becomes SIP identity idx 1, 2, ...
       - user_active: "on"
         user_name: "CHANGEME"
         user_host: pbx.example.com
@@ -98,8 +100,16 @@ between you and the phone. Common ones: `language`, `timezone`, `tone_scheme`,
 identity fields `user_active` / `user_name` / `user_host` / `user_pass` /
 `user_pname` (auth user, if it differs from `user_name`) / `user_realname`. The
 full list lives in Snom's docs; if a name is valid there, it's valid here. Note
-that Snom silently ignores unknown setting names, so a typo is a no-op rather than an
+that Snom silently ignores unknown setting names, so a typo is a no-op, not an
 error.
+
+**Web interface.** `http_user` / `http_pass` set the login for the phone's web
+UI on 8.x firmware, separate from `admin_mode_password` (which locks only the
+on-phone menu). To lock the web UI down hardest, uncomment `webserver_type: off`
+to disable it entirely; the phone then has no web UI at all, and the change
+needs a reboot. On the D8xx generation the web-UI credentials are instead
+`webserver_admin_name` / `webserver_admin_password`, out of scope here (8.x
+only), but that's the name to reach for if you add those models later.
 
 **Permissions.** Every setting is written with the fleet's `perm` value, which
 defaults to `R` (read-only / locked on the phone, the managed-fleet default).
@@ -107,7 +117,7 @@ Set the top-level `perm:` in the fleet file to change it globally: `RW` or an
 empty string leaves settings user-editable on the phone.
 
 Only `mac` is required per device (it's the filename key). A device with no
-accounts still gets its settings, which is useful for pushing localisation to a phone
+accounts still gets its settings, useful for pushing localisation to a phone
 whose identity is set elsewhere.
 
 ## Firmware / updates
@@ -146,8 +156,8 @@ serves via nginx, so secrets never bake into an image layer.
 
 ## Security
 
-The generated XML holds **cleartext SIP secrets** that Snom's provisioning model
-requires it (a phone has no credentials until it's provisioned). Protect the
+The generated XML holds **cleartext SIP secrets**, which Snom's provisioning
+model requires (a phone has no credentials until it's provisioned). Protect the
 files with the network, not the filename.
 
 - **Directory listing is off.** The container ships a minimal custom
@@ -155,8 +165,8 @@ files with the network, not the filename.
   the server delivers `snom-<mac>.xml` but won't enumerate the directory or
   leak its version.
 - **MAC filtering is deliberately not implemented.** MACs are on stickers and
-  sequential within a vendor block, so filtering by requested MAC stops nobody while adding
-  a parsing layer to debug at 3am. It's theatre; skipped.
+  sequential within a vendor block, so filtering by requested MAC stops nobody
+  while adding a parsing layer to debug at 3am. It's theatre; skipped.
 - **Real controls, cheapest first:** put provisioning traffic on an isolated
   voice VLAN (the server should not be reachable from the user LAN or
   internet); add HTTPS on nginx to encrypt secrets in flight; and treat

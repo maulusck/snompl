@@ -11,22 +11,24 @@ import yaml
 
 DEFAULT_PERM = "R"
 
-SAMPLE = """# perm applies to every emitted setting: R = locked, RW or "" = user-editable.
-perm: R
+SAMPLE = """# Snom XML provisioning. Values apply as-is; unknown keys are silently ignored.
+perm: R                          # R locked, RW or "" user-editable
 
-# Global settings applied to every phone. Keys are raw Snom setting names.
 settings:
   language: English
-  timezone: UTC                 # add `dst:` only if the phone still logs a DST error
+  timezone: UTC                  # Snom zone code, e.g. USA-5, ITA+1
   tone_scheme: USA
   ntp_server: pool.ntp.org
   admin_mode: "1"
-  admin_mode_password: "0000"   # digits 0-9 only; change before deploying
-  update_policy: settings_only  # load settings, never fetch firmware
+  admin_mode_password: "0000"    # phone menu lock; digits 0-9
+  http_user: admin               # web UI login (8.x)
+  http_pass: CHANGEME
+  # webserver_type: off          # disable web UI entirely; hardest lock, needs reboot
+  update_policy: settings_only   # never fetch firmware
 
 devices:
-  - mac: "00-04-13-00-00-00"    # Snom OUI + placeholder; replace with the real MAC
-    accounts:                   # each entry becomes identity idx=1, 2, 3...
+  - mac: "00-04-13-00-00-00"     # any separator; replace with real MAC
+    accounts:                    # each entry becomes SIP identity idx 1, 2, ...
       - user_active: "on"
         user_name: "CHANGEME"
         user_host: pbx.example.com
