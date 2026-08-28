@@ -4,8 +4,8 @@ WORKDIR /app
 COPY . /app
 RUN pip3 install --no-cache-dir --break-system-packages .
 
-# Full custom nginx: serve one dir, list nothing, no version banner.
-# Replaces Alpine's default include stack entirely — nothing we don't control.
+# Custom nginx, fully replacing Alpine's default config: serve /srv only,
+# no directory listing, no version banner.
 RUN cat > /etc/nginx/nginx.conf <<'EOF'
 worker_processes auto;
 daemon off;
@@ -15,7 +15,6 @@ events {}
 http {
     server_tokens off;
     types { text/xml xml; }
-    default_type application/octet-stream;
     access_log /dev/stdout;
     server {
         listen 80;

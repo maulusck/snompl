@@ -1,101 +1,100 @@
-"""snompl: minimal, database-free Snom desk phone provisioner."""
+"""snompl: minimal, database-free Snom desk phone provisioner.
+
+YAML keys are raw Snom setting names, so anything Snom accepts works here.
+Account identities are listed in order; snompl assigns their idx.
+"""
 import argparse
 import os
 import sys
+import xml.etree.ElementTree as ET
 import yaml
 
-# ponytail: template inlined. add a --template flag if fleets ever need custom XML.
-DEVICE_XML = """<?xml version="1.0" encoding="utf-8"?>
-<settings>
-  <phone-settings>
-    <admin_mode perm="R">1</admin_mode>
-    <admin_password perm="RW">{{ admin_pin }}</admin_password>
-    <ntp_server perm="R">{{ ntp }}</ntp_server>
-    <image_logo perm="R">{{ logo }}</image_logo>
-    <display_name perm="R">{{ name }}</display_name>
-    <lldp_enable perm="R">off</lldp_enable>
-    <auto_provision_timer perm="R">1440</auto_provision_timer>
-    <auto_provision_on_boot perm="R">on</auto_provision_on_boot>
-  </phone-settings>
-  <accounts>
-    <account idx="1" perm="RW">
-      <server perm="R">{{ pbx }}</server>
-      <user_name perm="R">{{ ext }}</user_name>
-      <account_name perm="R">{{ ext }} - {{ name }}</account_name>
-      <pass_name perm="R">{{ secret }}</pass_name>
-    </account>
-  </accounts>
-</settings>
-"""
+DEFAULT_PERM = "R"
 
-SAMPLE = """global:
-  pbx: pbx.internal.lan
-  ntp: pool.ntp.org
-  admin_pin: SecureAdminPin123
-  logo: http://pbx.internal.lan/branding/logo.bmp
+SAMPLE = """# perm applies to every emitted setting: R = locked, RW or "" = user-editable.
+perm: R
+
+# Global settings applied to every phone. Keys are raw Snom setting names.
+settings:
+  language: English
+  timezone: UTC                 # add `dst:` only if the phone still logs a DST error
+  tone_scheme: USA
+  ntp_server: pool.ntp.org
+  admin_mode: "1"
+  admin_mode_password: "0000"   # digits 0-9 only; change before deploying
+  update_policy: settings_only  # load settings, never fetch firmware
 
 devices:
-  - mac: "00-04-13-AA-11-BB"
-    ext: "101"
-    secret: SuperSecretSIP1
-    name: Reception Desk
+  - mac: "00-04-13-00-00-00"    # Snom OUI + placeholder; replace with the real MAC
+    accounts:                   # each entry becomes identity idx=1, 2, 3...
+      - user_active: "on"
+        user_name: "CHANGEME"
+        user_host: pbx.example.com
+        user_pass: CHANGEME
+        user_realname: "CHANGEME"
 """
-
-REQUIRED = ("mac", "ext", "secret", "name")
 
 
 def clean_mac(mac):
-    """Snom flat-file convention: lowercase hex, no separators."""
-    return mac.replace(":", "").replace("-", "").strip().lower()
+    """Keep hex only, lowercased (Snom flat-file convention)."""
+    return "".join(c for c in mac if c in "0123456789abcdefABCDEF").lower()
 
 
-def render(tmpl, ctx):
-    for k, v in ctx.items():
-        tmpl = tmpl.replace(f"{{{{ {k} }}}}", str(v))
-    return tmpl
+def build_device(defaults, dev, perm):
+    """Build the <settings> tree for one device."""
+    root = ET.Element("settings")
+    ps = ET.SubElement(root, "phone-settings")
+    for k, v in {**defaults, **dev.get("settings", {})}.items():
+        ET.SubElement(ps, k, perm=perm).text = str(v)
+    for idx, acct in enumerate(dev.get("accounts", []), 1):
+        for k, v in acct.items():
+            ET.SubElement(ps, k, idx=str(idx), perm=perm).text = str(v)
+    ET.indent(root)
+    return root
 
 
 def generate(config, outdir):
-    with open(config) as f:  # raises FileNotFoundError -> caught in main()
+    with open(config) as f:
         fleet = yaml.safe_load(f) or {}
-    glob = fleet.get("global", {})
+    perm = fleet.get("perm", DEFAULT_PERM)
+    defaults = fleet.get("settings", {})
     devices = fleet.get("devices", [])
     os.makedirs(outdir, exist_ok=True)
 
     print(f"[*] Compiling {len(devices)} device(s) from {config}...")
     for i, dev in enumerate(devices):
-        missing = [k for k in REQUIRED if not dev.get(k)]
-        if missing:
-            sys.exit(f"[!] device {i}: missing {', '.join(missing)}")
+        if not dev.get("mac"):
+            sys.exit(f"[!] device {i}: missing mac")
         mac = clean_mac(dev["mac"])
         path = os.path.join(outdir, f"snom-{mac}.xml")
-        with open(path, "w") as f:
-            f.write(render(DEVICE_XML, {**glob, **dev, "mac": mac}))
-        print(f" [OK] snom-{mac}.xml (ext {dev['ext']})")
+        ET.ElementTree(build_device(defaults, dev, perm)).write(
+            path, encoding="utf-8", xml_declaration=True
+        )
+        print(f" [OK] snom-{mac}.xml ({len(dev.get('accounts', []))} account(s))")
     print(f"[*] Done -> {outdir}")
 
 
 def main():
-    p = argparse.ArgumentParser(prog="snompl", description=__doc__)
-    sub = p.add_subparsers(dest="cmd", required=True)
+    parser = argparse.ArgumentParser(prog="snompl", description="Snom phone provisioner.")
+    sub = parser.add_subparsers(dest="cmd", required=True)
 
-    i = sub.add_parser("init", help="write a sample fleet.yaml")
-    i.add_argument("-o", "--output", default="fleet.yaml")
+    init_p = sub.add_parser("init", help="write a sample fleet.yaml")
+    init_p.add_argument("-o", "--output", default="fleet.yaml")
 
-    g = sub.add_parser("generate", help="compile a fleet into per-MAC XML")
-    g.add_argument("-c", "--config", default="fleet.yaml")
-    g.add_argument("-o", "--output", default="./output/snom")
+    gen_p = sub.add_parser("generate", help="compile a fleet into per-MAC XML")
+    gen_p.add_argument("-c", "--config", default="fleet.yaml")
+    gen_p.add_argument("-o", "--output", default="./output/snom")
 
-    a = p.parse_args()
+    args = parser.parse_args()
     try:
-        if a.cmd == "init":
-            if os.path.exists(a.output):
-                sys.exit(f"[!] {a.output} already exists")
-            with open(a.output, "w") as f:
+        if args.cmd == "init":
+            if os.path.exists(args.output):
+                sys.exit(f"[!] {args.output} already exists")
+            with open(args.output, "w") as f:
                 f.write(SAMPLE)
-            print(f"[+] wrote {a.output}")
+            print(f"[+] wrote {args.output}")
         else:
-            generate(a.config, a.output)
+            generate(args.config, args.output)
     except (FileNotFoundError, yaml.YAMLError) as e:
         sys.exit(f"[!] {e}")
 
