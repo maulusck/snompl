@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write        # trusted publishing, no API token
+      contents: write        # create the GitHub release
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,3 +22,7 @@ jobs:
       - run: python tests/test_snompl.py && python tests/test_pbx_export.py
       - run: python -m build
       - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

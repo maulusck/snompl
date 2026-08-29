@@ -1,16 +1,56 @@
 [build-system]
-requires = ["setuptools>=61", "setuptools_scm>=8"]
+requires = ["setuptools>=77", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "snompl"
 description = "Minimal, database-free Snom desk phone provisioner."
+readme = "README.md"
 requires-python = ">=3.9"
+license = "MIT"
+authors = [{ name = "Maulusck", email = "maulusck@pm.me" }]
+maintainers = [{ name = "Maulusck", email = "maulusck@pm.me" }]
+keywords = [
+    "snom", "provisioning", "auto-provisioning", "autoprovision",
+    "sip", "voip", "telephony", "pbx", "asterisk", "freepbx",
+    "desk-phone", "ip-phone", "voip-phone", "dhcp-option-66",
+    "fleet", "cli", "sysadmin", "yaml", "xml",
+]
 dependencies = ["PyYAML>=6"]
 dynamic = ["version"]
 
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Environment :: No Input/Output (Daemon)",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Telecommunications Industry",
+    "Intended Audience :: Information Technology",
+    "Operating System :: POSIX",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Telephony",
+    "Topic :: Communications :: Internet Phone",
+    "Topic :: System :: Systems Administration",
+    "Topic :: System :: Networking",
+    "Topic :: Utilities",
+]
+
 [project.optional-dependencies]
 pbx = ["PyMySQL>=1"]
+
+[project.urls]
+Homepage = "https://github.com/maulusck/snompl"
+Source = "https://github.com/maulusck/snompl"
+Issues = "https://github.com/maulusck/snompl/issues"
+Changelog = "https://github.com/maulusck/snompl/commits"
 
 [project.scripts]
 snompl = "snompl:main"
