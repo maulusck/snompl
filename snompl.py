@@ -7,7 +7,13 @@ import argparse
 import os
 import sys
 import xml.etree.ElementTree as ET
+from importlib.metadata import PackageNotFoundError, version
 import yaml
+
+try:
+    __version__ = version("snompl")
+except PackageNotFoundError:
+    __version__ = "dev"
 
 DEFAULT_PERM = "R"
 
@@ -72,6 +78,7 @@ def generate(config, outdir):
 
 def main():
     parser = argparse.ArgumentParser(prog="snompl", description="Snom phone provisioner.")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     init_p = sub.add_parser("init", help="write a sample fleet.yaml (globals only)")

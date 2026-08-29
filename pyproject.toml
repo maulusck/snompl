@@ -1,13 +1,13 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=61", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "snompl"
-version = "1.0.0"
 description = "Minimal, database-free Snom desk phone provisioner."
 requires-python = ">=3.9"
 dependencies = ["PyYAML>=6"]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 pbx = ["PyMySQL>=1"]
@@ -17,3 +17,6 @@ snompl = "snompl:main"
 
 [tool.setuptools]
 py-modules = ["snompl", "pbx_export"]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0+unknown"
