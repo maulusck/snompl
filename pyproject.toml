@@ -3,14 +3,17 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "snom-provisioner-lite"
+name = "snompl"
 version = "1.0.0"
 description = "Minimal, database-free Snom desk phone provisioner."
 requires-python = ">=3.9"
 dependencies = ["PyYAML>=6"]
 
+[project.optional-dependencies]
+pbx = ["PyMySQL>=1"]
+
 [project.scripts]
 snompl = "snompl:main"
 
 [tool.setuptools]
-py-modules = ["snompl"]
+py-modules = ["snompl", "pbx_export"]

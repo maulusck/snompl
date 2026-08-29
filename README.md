@@ -2,29 +2,41 @@
 
 Minimal, database-free auto-provisioning for Snom desk phones. One YAML fleet
 file in, per-MAC XML configs out. No web app, no DB, no state; just a compiler
-you point at a config.
+you point at a config, plus an optional exporter that builds the fleet from an
+Asterisk PBX.
 
 ## Install
 
 ```bash
-pip install .          # or: pip install -e .  for development
+pip install snompl          # compiler (init, generate)
+pip install snompl[pbx]     # adds the Asterisk exporter (PyMySQL), on the PBX
 ```
 
-Requires Python ≥ 3.9 and PyYAML (the only dependency).
+From a clone, `python ./snompl.py <cmd>` works the same as the installed
+`snompl` command. Requires Python >= 3.9.
 
-## Quick start
+## The flow
 
 ```bash
-snompl init            # writes a sample fleet.yaml
-$EDITOR fleet.yaml     # fill in your phones
-snompl generate        # -> ./output/snom/snom-<mac>.xml per device
+snompl init            > fleet.yaml     # scaffold globals (no devices yet)
+snompl export --macs macs.csv >> fleet.yaml   # append devices from the PBX (optional)
+snompl generate                          # compile -> ./output/snom/snom-<mac>.xml
 ```
+
+`init` writes the global settings, `export` appends real devices, `generate`
+compiles. Each stage feeds the next by pipe. For a handful of phones, skip
+`export` and add devices to `fleet.yaml` by hand.
 
 ## Commands
 
 ### `snompl init [-o PATH]`
-Writes a sample fleet file. Refuses to overwrite an existing one.
-Default: `fleet.yaml`.
+Writes a sample fleet file with global settings and no `devices:` key, so
+`export >>` can append cleanly. Refuses to overwrite. Default: `fleet.yaml`.
+
+### `snompl export [--macs CSV] [--host HOST] [--db NAME]`
+Reads the local Asterisk DB and emits a `devices:` block on stdout;
+diagnostics go to stderr, so `>> fleet.yaml` stays clean. See
+[Building a fleet from Asterisk](#building-a-fleet-from-asterisk).
 
 ### `snompl generate [-c CONFIG] [-o OUTPUT]`
 Compiles a fleet into one XML file per device, named `snom-<mac>.xml`
@@ -78,14 +90,10 @@ devices:
         user_host: pbx.example.com
         user_pass: CHANGEME
         user_realname: "CHANGEME"
-  - mac: "00-04-13-00-00-01"
-    accounts:
-      - user_active: "on"
-        user_name: "CHANGEME"
-        user_host: pbx.example.com
-        user_pass: CHANGEME
-        user_realname: "CHANGEME"
 ```
+
+`snompl init` omits the `devices:` block so the exporter can append one; add it
+yourself when editing by hand.
 
 **How it maps.** Everything becomes a flat setting inside one `<phone-settings>`
 container, the only shape Snom's provisioning format accepts. Global
@@ -120,27 +128,82 @@ Only `mac` is required per device (it's the filename key). A device with no
 accounts still gets its settings, useful for pushing localisation to a phone
 whose identity is set elsewhere.
 
-## Firmware / updates
+## Building a fleet from Asterisk
 
-`update_policy: settings_only` in the sample tells the phone to apply settings
-but never fetch firmware, so the phone stops probing for firmware files (no more
-404 noise) while still re-reading its config. Do **not** use `never_update` for
-this: that disables provisioning entirely, so the phone would stop loading your
-settings too.
+`snompl export` reads the local Asterisk DB (`users` joined to `sip` on
+`keyword='secret'`), optionally binds each extension to a MAC, and prints a
+`devices:` block. Needs `pip install snompl[pbx]`. DB credentials come from
+`~/.my.cnf` (the same option file the `mysql` client uses), so no credentials
+live in the tool.
+
+```
+snompl export [--macs CSV] [--host HOST] [--db NAME]
+```
+
+- `--macs CSV` : an `ext,mac` file, or `-` to read the CSV from stdin.
+  Extensions not listed get the placeholder MAC `00-04-13-00-00-00`, so
+  `grep 00-04-13-00-00-00 fleet.yaml` is your list of still-unbound phones.
+- `--host HOST` : SIP registrar host. Defaults to this server's FQDN.
+- `--db NAME` : database name, default `asterisk`.
+
+Extensions with no secret are skipped with a stderr warning (a secretless phone
+can't register). Shared secrets are flagged to stderr; Asterisk often ships a
+common default secret, so rotate before provisioning.
+
+### Where it runs
+
+`snompl export` reads the PBX database directly, so it runs on the PBX. There is
+no remote-DB flag and no port-forwarding by design: exposing the DB to the
+network is the thing to avoid, and a managed SSH tunnel is a process to leak.
+To run it from your workstation, run the whole command over SSH so it still
+executes on the PBX and only the YAML crosses the wire:
+
+```bash
+ssh pbx.example.com 'snompl export --macs -' < macs.csv >> fleet.yaml
+```
+
+If the database can't be reached, the tool says so and names the fix rather
+than dumping a stack trace.
 
 ## Serving to phones (DHCP Option 66)
 
 Phones fetch their config over HTTP. Point DHCP **Option 66** at the server
-holding the generated files, e.g.:
+holding the generated files:
 
 ```
 Option 66 = http://<server>/snom
 ```
 
 Snom phones request `snom-<mac>.xml` on boot, then re-check on their own
-provisioning schedule. snompl no longer forces an interval; set one explicitly
-via a Snom setting (e.g. `setting_server` / update cadence) if you need a
-specific cadence.
+provisioning schedule.
+
+### FreePBX host (worked example)
+
+Symlink snompl's output into the FreePBX docroot and let Apache force the whole
+UI to HTTPS while leaving `/snom/` on plain HTTP for provisioning (phones have
+no cert trust before they're provisioned):
+
+```bash
+ln -s /path/to/output/snom /var/www/html/snom
+```
+
+```apache
+<VirtualHost *:80>
+    DocumentRoot /var/www/html
+
+    <Directory /var/www/html>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    # Redirect everything to HTTPS except /snom/
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/snom/(.*)$ [NC]
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</VirtualHost>
+```
 
 ### Container
 
@@ -179,7 +242,8 @@ behind.
 ## Test
 
 ```bash
-python test_snompl.py     # -> ok
+python tests/test_snompl.py       # -> ok
+python tests/test_pbx_export.py   # -> ok
 ```
 
 ## Layout
@@ -190,8 +254,11 @@ snom-provisioner-lite/
 ├── LICENSE
 ├── pyproject.toml
 ├── README.md
-├── snompl.py          # the whole tool
-├── test_snompl.py
+├── snompl.py            # compiler: init, generate, CLI router
+├── pbx_export.py        # export: Asterisk -> devices YAML (optional PyMySQL)
+├── tests/
+│   ├── test_snompl.py
+│   └── test_pbx_export.py
 └── .gitignore
 ```
 
