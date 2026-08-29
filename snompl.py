@@ -82,6 +82,8 @@ def main():
                        help="ext,mac map ('-' for stdin); unmatched get a placeholder MAC")
     exp_p.add_argument("--host", help="SIP registrar host (default: this server's FQDN)")
     exp_p.add_argument("--db", default="asterisk", help="database name (default: asterisk)")
+    exp_p.add_argument("--socket", default="/var/run/mysqld/mysqld.sock",
+                       help="MariaDB unix socket (default: /var/run/mysqld/mysqld.sock)")
 
     gen_p = sub.add_parser("generate", help="compile a fleet into per-MAC XML")
     gen_p.add_argument("-c", "--config", default="fleet.yaml")

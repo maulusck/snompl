@@ -132,9 +132,9 @@ whose identity is set elsewhere.
 
 `snompl export` reads the local Asterisk DB (`users` joined to `sip` on
 `keyword='secret'`), optionally binds each extension to a MAC, and prints a
-`devices:` block. Needs `pip install snompl[pbx]`. DB credentials come from
-`~/.my.cnf` (the same option file the `mysql` client uses), so no credentials
-live in the tool.
+`devices:` block. Needs `pip install snompl[pbx]`. It connects over the local
+MariaDB unix socket as the current OS user, so it is authless on the PBX and no
+credentials live in the tool.
 
 ```
 snompl export [--macs CSV] [--host HOST] [--db NAME]
@@ -145,6 +145,7 @@ snompl export [--macs CSV] [--host HOST] [--db NAME]
   `grep 00-04-13-00-00-00 fleet.yaml` is your list of still-unbound phones.
 - `--host HOST` : SIP registrar host. Defaults to this server's FQDN.
 - `--db NAME` : database name, default `asterisk`.
+- `--socket PATH` : MariaDB unix socket, default `/var/run/mysqld/mysqld.sock`.
 
 Extensions with no secret are skipped with a stderr warning (a secretless phone
 can't register). Shared secrets are flagged to stderr; Asterisk often ships a

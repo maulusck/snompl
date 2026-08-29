@@ -32,19 +32,20 @@ def load_macs(path):
             f.close()
 
 
-def fetch(db):
+def fetch(db, socket_path):
     try:
         import pymysql
     except ImportError:
         sys.exit("[!] snompl export needs a MySQL driver: pip install snompl[pbx]")
     try:
-        con = pymysql.connect(read_default_file=os.path.expanduser("~/.my.cnf"),
+        con = pymysql.connect(unix_socket=socket_path, user=os.environ.get("USER", "root"),
                               database=db, cursorclass=pymysql.cursors.DictCursor)
     except pymysql.Error as e:
         sys.exit(
-            f"[!] cannot reach the '{db}' database on localhost: {e}\n"
-            "    snompl export reads the PBX database directly, so run it ON the PBX.\n"
-            "    From elsewhere, run the whole command over SSH instead:\n"
+            f"[!] cannot reach the '{db}' database over {socket_path}: {e}\n"
+            "    snompl export reads the local PBX database over its unix socket, so\n"
+            "    run it ON the PBX as a user the DB trusts (--socket if it lives elsewhere).\n"
+            "    From your workstation, run the whole command over SSH instead:\n"
             "        ssh pbx.example.com 'snompl export --macs -' < macs.csv >> fleet.yaml"
         )
     try:
@@ -87,7 +88,7 @@ def build(rows, macs, host):
 
 def run(args):
     macs = load_macs(args.macs) if args.macs else {}
-    rows = fetch(args.db)
+    rows = fetch(args.db, args.socket)
     devices, (skipped, unbound, dupes) = build(rows, macs, args.host or socket.getfqdn())
     yaml.safe_dump({"devices": devices}, sys.stdout, sort_keys=False, default_flow_style=False)
     print(f"[*] {len(rows)} ext, {skipped} skipped, {unbound} unbound, {dupes} shared-secret",
