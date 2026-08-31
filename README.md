@@ -136,12 +136,12 @@ snompl export [--macs CSV] [--host HOST] [--db NAME] [--socket PATH]
 
 | Option | Default | Meaning |
 |--------|---------|---------|
-| `--macs` | none | `ext,mac` file, or `-` to read from standard input. Unlisted extensions receive the placeholder MAC `00-04-13-00-00-00`. |
+| `--macs` | none | `ext,mac` file, or `-` to read from standard input. Unlisted extensions receive the placeholder MAC `000413000000`. |
 | `--host` | server FQDN | SIP registrar host. |
 | `--db` | `asterisk` | Database name. |
 | `--socket` | `/var/run/mysqld/mysqld.sock` | MariaDB Unix socket. |
 
-`grep 00-04-13-00-00-00 fleet.yaml` lists the phones still awaiting a MAC.
+`grep 000413000000 fleet.yaml` lists the phones still awaiting a MAC.
 Extensions without a secret are reported and skipped, since a phone without a
 secret cannot register. Shared secrets are reported; Asterisk installations
 frequently reuse a default secret, which should be rotated before provisioning.

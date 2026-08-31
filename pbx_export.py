@@ -14,7 +14,9 @@ try:
 except ImportError:
     sys.exit("[!] PyYAML not installed: pip install PyYAML")
 
-PLACEHOLDER_MAC = "00-04-13-00-00-00"
+from snompl import clean_mac
+
+PLACEHOLDER_MAC = "000413000000"
 
 QUERY = (
     "SELECT u.extension, u.name, s.data AS secret "
@@ -70,7 +72,7 @@ def build(rows, macs, host):
             dupes += 1
         else:
             seen[secret] = ext
-        mac = macs.get(ext, PLACEHOLDER_MAC)
+        mac = clean_mac(macs.get(ext, PLACEHOLDER_MAC))
         if mac == PLACEHOLDER_MAC:
             unbound += 1
         devices.append({
