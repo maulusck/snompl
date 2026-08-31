@@ -1,9 +1,4 @@
-"""snompl export: read Asterisk extensions, emit a snompl `devices:` block.
-
-Runs where the asterisk DB is local (the PBX). PyMySQL is imported lazily so
-the rest of snompl needs no database driver. This module has no entry point of
-its own; reach it through `snompl export`.
-"""
+"""Read Asterisk extensions and emit a snompl `devices:` block (run on the PBX)."""
 import csv
 import os
 import socket

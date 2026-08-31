@@ -207,8 +207,9 @@ podman run -d --name snompl -p 80:80 \
   snompl:latest
 ```
 
-The image mounts `fleet.yaml` at runtime and generates on start, so secrets are
-never written into an image layer.
+The image contains only the tool, never a fleet: `fleet.yaml` is mounted at
+runtime and compiled on every start, so secrets never enter an image layer. If
+no fleet is mounted, generation fails and nginx does not start.
 
 ## Security
 

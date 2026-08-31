@@ -1,11 +1,10 @@
 FROM alpine:3.24
 RUN apk add --no-cache python3 py3-pip nginx
 WORKDIR /app
-COPY . /app
+# copy only install inputs so fleet.yaml/macs.csv/output can't bake into a layer
+COPY pyproject.toml README.md LICENSE snompl.py pbx_export.py /app/
 RUN pip3 install --no-cache-dir --break-system-packages .
 
-# Custom nginx, fully replacing Alpine's default config: serve /srv only,
-# no directory listing, no version banner.
 RUN cat > /etc/nginx/nginx.conf <<'EOF'
 worker_processes auto;
 daemon off;
@@ -24,7 +23,5 @@ http {
 }
 EOF
 
-# fleet.yaml mounted at runtime (no secrets in image layers); generate then serve.
-# Phones fetch http://<server>/snom/snom-<mac>.xml  ->  /srv/snom/snom-<mac>.xml
 CMD sh -c "snompl generate -c /app/fleet.yaml -o /srv/snom && nginx"
 EXPOSE 80

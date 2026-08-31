@@ -1,8 +1,4 @@
-"""snompl: minimal, database-free Snom desk phone provisioner.
-
-YAML keys are raw Snom setting names, so anything Snom accepts works here.
-Account identities are listed in order; snompl assigns their idx.
-"""
+"""Minimal, database-free Snom desk phone provisioner."""
 import argparse
 import os
 import sys
